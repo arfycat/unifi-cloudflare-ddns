@@ -24,13 +24,26 @@
         // Throws exception when query parameters aren't formatted correctly
         const url = new URL(request.url);
         verifyParameters(url);
+        const hostname = url.searchParams.get("hostname");
+
+        if (CLIENT_USER == "" || CLIENT_PASSWORD == "" || ZONE == "" || DYNAMIC_HOST == "" || CF_API_TOKEN == "") {
+          throw new InternalServerError("Missing configuration values.");
+        }
+        
+        if (hostname !== DYNAMIC_HOST) {
+          throw new BadRequestException("Unsupported hostname");
+        }
+
+        if (username !== CLIENT_USER || password !== CLIENT_PASSWORD) {
+          throw new UnauthorizedException("Please provide valid credentials.");
+        }
 
         // Only returns this response when no exception is thrown.
-        const response = await informAPI(url, username, password);
+        const response = await informAPI(url, ZONE, DYNAMIC_HOST, CF_API_TOKEN);
         return response;
       }
 
-      throw new BadRequestException("Please provide valid credentials.");
+      throw new UnauthorizedException("Please provide valid credentials.");
 
     case "/favicon.ico":
     case "/robots.txt":
@@ -47,9 +60,7 @@
  * @param {String} token
  * @returns {Promise<Response>}
  */
-async function informAPI(url, name, token) {
-  // Parse Url
-  const hostname = url.searchParams.get("hostname");
+async function informAPI(url, name, hostname, token) {
   // Get the IP address. This can accept two query parameters, this will
   // use the "ip" query parameter if it is set, otherwise falling back to "myip". 
   const ip = url.searchParams.get("ip") || url.searchParams.get("myip");
@@ -124,6 +135,14 @@ function basicAuthentication(request) {
     username: decoded.substring(0, index),
     password: decoded.substring(index + 1),
   };
+}
+
+class InternalServerError {
+  constructor(reason) {
+    this.status = 500;
+    this.statusText = "Internal Server Error";
+    this.reason = reason;
+  }
 }
 
 class UnauthorizedException {
